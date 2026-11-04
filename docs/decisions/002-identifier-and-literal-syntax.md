@@ -1,6 +1,6 @@
 # 002. Identifier syntax, literal formats and schema details
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-04
 
 ## Context
@@ -10,15 +10,25 @@ syntax of identifiers and time literals, and some schema details, to the
 implementation of `asi_core` (Slice 1). These choices show up in content files,
 saves and error messages, so they should be written down once.
 
+This record also supersedes one line of ADR-001 §2: the bare `HH:MM` time
+literal meaning day 1 (see "Time and duration literals" below).
+
 ## Decision
 
 ### Identifiers
-- A **segment** matches `[a-z][a-z0-9_]*`: ASCII only, lowercase, starting with
-  a letter. No length limit.
-- Symbols, ID kinds, namespaces and module names are one segment.
+- Names are ASCII only and lowercase, with no length limit. There are two
+  segment shapes:
+  - A **name segment** matches `[a-z][a-z0-9_]*` (starts with a letter).
+  - A **path segment** matches `[a-z0-9][a-z0-9_]*` (may start with a digit).
+- Symbols, ID kinds, namespaces and module names are one name segment.
 - IDs are `kind.path` and state keys are `namespace.name`, where `path` and
-  `name` are dotted paths of one or more segments (`scene.case1.diner.arrive`,
-  `travel.npc.carla`).
+  `name` are dotted paths of one or more path segments
+  (`scene.case1.diner.arrive`, `travel.npc.carla`). So the first segment is
+  always letter-first and later ones may start with a digit:
+  `line.case1.carla.042` is valid, `042.carla` is not.
+- Namespaces and ID kinds share one name space: declaring a namespace with the
+  name of a registered ID kind is an error, so `clue.x` can never be read as
+  both a key and an ID.
 - Symbols are stored without the colon; their text form is `:name`.
 - `Id` and `Key` order by their first segment, then the rest, compared bytewise.
 
@@ -26,8 +36,13 @@ saves and error messages, so they should be written down once.
 - `Time` is never negative: game start is the earliest time. Arithmetic that
   would go before it returns `None`, like overflow does.
 - Time literals are strict: `dN HH:MM` with exactly one space, no leading zeros
-  in `N`, and two-digit hour and minute. `HH:MM` means day 1. Display always
-  uses `dN HH:MM`.
+  in `N`, and two-digit hour and minute. This is the only form; Display writes
+  it too.
+- **Supersedes ADR-001 §2's `HH:MM` line.** A bare `HH:MM` (meaning day 1) is
+  not a time literal. Day 1 is rarely what a writer means by `22:00`; usually
+  they mean "22:00 on whatever day it is", which is a time-of-day check, not a
+  point in time. Those checks will come from the expression language (e.g. a
+  function over the current time) instead.
 - Durations may be negative. A duration literal is an optional `-` and one or
   more `<number><unit>` components, units `d`, `h`, `m` each at most once and in
   that order (`1d2h30m`). Numbers have no leading zeros and may exceed their
@@ -53,3 +68,7 @@ saves and error messages, so they should be written down once.
   instead.
 - The expression lexer (Slice for `asi_expr`) must tokenize combined
   durations like `1h30m` and negative literals consistently with this ADR.
+- The expression language needs a way to test time of day, since `HH:MM` alone
+  is no longer a literal.
+- ID paths can carry numbered parts (`line.case1.carla.042`) without a letter
+  prefix.

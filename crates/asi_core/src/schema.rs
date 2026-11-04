@@ -188,13 +188,24 @@ impl StateSchema {
     }
 
     /// Declares namespace `name`, owned by `owner`. The name is one
-    /// identifier segment. Declaring a namespace twice is an error.
+    /// identifier segment. Declaring a namespace twice is an error, and so
+    /// is using the name of a registered ID kind: namespaces and ID kinds
+    /// share one name space.
     pub fn add_namespace(&mut self, name: &str, owner: Owner) -> Result<()> {
         check_segment("namespace", name)?;
         if let Some(existing) = self.data.namespaces.get(name) {
             return Err(CoreError::DuplicateNamespace {
                 namespace: name.to_owned(),
                 owner: existing.clone(),
+            });
+        }
+        if let Some(kind_owner) = IdKind::new(name)
+            .ok()
+            .and_then(|kind| self.data.kinds.owner(&kind))
+        {
+            return Err(CoreError::NamespaceIsKind {
+                namespace: name.to_owned(),
+                owner: kind_owner.clone(),
             });
         }
         self.data.namespaces.insert(name.to_owned(), owner);
@@ -344,12 +355,19 @@ mod tests {
         let nested = key("travel.npc.carla");
         assert_eq!((nested.namespace(), nested.name()), ("travel", "npc.carla"));
         assert_eq!(nested, Key::new("travel", "npc.carla").unwrap());
+        let numbered = key("dialogue.carla.042");
+        assert_eq!(numbered.name(), "carla.042");
+        assert_eq!(numbered.to_string(), "dialogue.carla.042");
+        assert_eq!(key("dialogue.042").name(), "042");
         for bad in [
             "travel",
             "travel.",
             ".mode",
             "Travel.mode",
             "travel..mode",
+            "1travel.mode",
+            "042.mode",
+            "travel._mode",
             "",
         ] {
             assert!(bad.parse::<Key>().is_err(), "{bad}");
@@ -371,6 +389,28 @@ mod tests {
         );
         assert!(schema.add_namespace("a.b", Owner::game()).is_err());
         assert!(schema.add_namespace("", Owner::game()).is_err());
+        assert!(schema.add_namespace("1st", Owner::game()).is_err());
+    }
+
+    #[test]
+    fn namespaces_cannot_reuse_id_kind_names() {
+        let mut schema = schema();
+        let err = schema
+            .add_namespace("clue", Owner::module("travel").unwrap())
+            .unwrap_err();
+        assert_eq!(
+            err,
+            CoreError::NamespaceIsKind {
+                namespace: "clue".to_owned(),
+                owner: Owner::game()
+            }
+        );
+        assert_eq!(
+            err.to_string(),
+            "namespace `clue` has the same name as an ID kind registered by the game; \
+             namespaces and ID kinds share one name space"
+        );
+        assert_eq!(schema.clone().freeze().namespace_owner("clue"), None);
     }
 
     #[test]

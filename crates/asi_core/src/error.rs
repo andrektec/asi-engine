@@ -54,6 +54,15 @@ pub enum CoreError {
         /// Who declared it first.
         owner: Owner,
     },
+    /// A namespace was declared with the name of a registered ID kind.
+    /// Namespaces and ID kinds share one name space, so `clue.x` is never
+    /// ambiguous between a key and an ID.
+    NamespaceIsKind {
+        /// The rejected namespace.
+        namespace: String,
+        /// Who registered the ID kind of that name.
+        owner: Owner,
+    },
     /// A key was declared in a namespace that was never declared.
     UnknownNamespace {
         /// The key being declared.
@@ -128,6 +137,11 @@ impl fmt::Display for CoreError {
             Self::DuplicateNamespace { namespace, owner } => {
                 write!(f, "namespace `{namespace}` is already declared by {owner}")
             }
+            Self::NamespaceIsKind { namespace, owner } => write!(
+                f,
+                "namespace `{namespace}` has the same name as an ID kind registered by {owner}; \
+                 namespaces and ID kinds share one name space"
+            ),
             Self::UnknownNamespace { key } => write!(
                 f,
                 "key `{key}` is in namespace `{}`, which is not declared",

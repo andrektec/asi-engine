@@ -2,17 +2,25 @@
 //!
 //! # Identifier rules
 //!
-//! Every name in the engine is built from *segments*. A segment is non-empty,
-//! starts with an ASCII lowercase letter (`a`–`z`) and continues with ASCII
-//! lowercase letters, ASCII digits (`0`–`9`) or underscores (`_`). That is,
-//! `[a-z][a-z0-9_]*`. Uppercase, hyphens and non-ASCII characters are rejected
-//! so names are unambiguous in content, file names and saves.
+//! Every name in the engine is built from *segments* of ASCII lowercase
+//! letters (`a`–`z`), ASCII digits (`0`–`9`) and underscores (`_`). There are
+//! two shapes:
 //!
-//! A *dotted path* is one or more segments joined by single dots
-//! (`case1.diner.arrive`).
+//! - A *name segment* starts with a letter: `[a-z][a-z0-9_]*`. Symbols, ID
+//!   kinds, namespaces and module names are one name segment.
+//! - A *path segment* starts with a letter or digit: `[a-z0-9][a-z0-9_]*`.
 //!
-//! - [`Symbol`]: one segment (`bicycle`, written `:bicycle` in content).
-//! - [`IdKind`]: one segment (`clue`).
+//! A *dotted path* is one or more path segments joined by single dots
+//! (`case1.carla.042`). An [`Id`] is a kind followed by a dotted path, and a
+//! state key is a namespace followed by a dotted path, so their first segment
+//! is always letter-first and later ones may start with a digit
+//! (`line.case1.carla.042`).
+//!
+//! Uppercase, hyphens and non-ASCII characters are rejected so names are
+//! unambiguous in content, file names and saves.
+//!
+//! - [`Symbol`]: one name segment (`bicycle`, written `:bicycle` in content).
+//! - [`IdKind`]: one name segment (`clue`).
 //! - [`Id`]: a kind plus a dotted path (`clue.receipt_photo`).
 
 use std::fmt;
@@ -20,25 +28,42 @@ use std::str::FromStr;
 
 use crate::error::{CoreError, Result};
 
-/// Checks one segment; returns the reason it is invalid.
-fn segment_error(text: &str) -> Option<&'static str> {
+/// Whether `c` may appear after the first character of any segment.
+fn is_tail_char(c: char) -> bool {
+    c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'
+}
+
+/// Checks a name segment (`[a-z][a-z0-9_]*`); returns why it is invalid.
+fn name_segment_error(text: &str) -> Option<&'static str> {
     let mut chars = text.chars();
     match chars.next() {
         None => Some("must not be empty"),
         Some(c) if !c.is_ascii_lowercase() => Some("must start with a lowercase ASCII letter"),
-        Some(_) => {
-            if chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_') {
-                None
-            } else {
-                Some("may only contain lowercase ASCII letters, digits and `_`")
-            }
+        Some(_) if !chars.all(is_tail_char) => {
+            Some("may only contain lowercase ASCII letters, digits and `_`")
         }
+        Some(_) => None,
     }
 }
 
-/// Validates one segment, reporting errors as `what`.
+/// Checks a path segment (`[a-z0-9][a-z0-9_]*`); returns why it is invalid.
+fn path_segment_error(text: &str) -> Option<&'static str> {
+    let mut chars = text.chars();
+    match chars.next() {
+        None => Some("has an empty segment (check for stray dots)"),
+        Some(c) if !(c.is_ascii_lowercase() || c.is_ascii_digit()) => {
+            Some("each segment must start with a lowercase ASCII letter or digit")
+        }
+        Some(_) if !chars.all(is_tail_char) => {
+            Some("may only contain lowercase ASCII letters, digits, `_` and `.`")
+        }
+        Some(_) => None,
+    }
+}
+
+/// Validates one name segment, reporting errors as `what`.
 pub(crate) fn check_segment(what: &'static str, text: &str) -> Result<()> {
-    match segment_error(text) {
+    match name_segment_error(text) {
         None => Ok(()),
         Some(reason) => Err(CoreError::InvalidName {
             what,
@@ -48,22 +73,17 @@ pub(crate) fn check_segment(what: &'static str, text: &str) -> Result<()> {
     }
 }
 
-/// Validates a dotted path of one or more segments, reporting errors as `what`.
+/// Validates a dotted path of one or more path segments, reporting errors as
+/// `what`.
 pub(crate) fn check_path(what: &'static str, text: &str) -> Result<()> {
-    for segment in text.split('.') {
-        if let Some(reason) = segment_error(segment) {
-            return Err(CoreError::InvalidName {
-                what,
-                text: text.to_owned(),
-                reason: if segment.is_empty() {
-                    "has an empty segment (check for stray dots)"
-                } else {
-                    reason
-                },
-            });
-        }
+    match text.split('.').find_map(path_segment_error) {
+        None => Ok(()),
+        Some(reason) => Err(CoreError::InvalidName {
+            what,
+            text: text.to_owned(),
+            reason,
+        }),
     }
-    Ok(())
 }
 
 /// A value of an enum type, such as `:bicycle`.
@@ -206,18 +226,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn segments_accept_valid_names() {
+    fn name_segments() {
         for ok in ["a", "bicycle", "case1", "met_marcos", "a_1_b", "x__"] {
-            assert!(segment_error(ok).is_none(), "{ok}");
+            assert!(name_segment_error(ok).is_none(), "{ok}");
+        }
+        for bad in [
+            "", "1a", "042", "_a", "Bicycle", "biCycle", "a-b", "a b", "a.b", "ção", ":a",
+        ] {
+            assert!(name_segment_error(bad).is_some(), "{bad}");
         }
     }
 
     #[test]
-    fn segments_reject_invalid_names() {
-        for bad in [
-            "", "1a", "_a", "Bicycle", "biCycle", "a-b", "a b", "a.b", "ção", ":a",
-        ] {
-            assert!(segment_error(bad).is_some(), "{bad}");
+    fn path_segments_may_start_with_a_digit() {
+        for ok in ["a", "case1", "042", "1a", "0", "2nd_visit"] {
+            assert!(path_segment_error(ok).is_none(), "{ok}");
+        }
+        for bad in ["", "_a", "_1", "A1", "1A", "a-b", "a.b", "ção"] {
+            assert!(path_segment_error(bad).is_some(), "{bad}");
         }
     }
 
@@ -236,6 +262,8 @@ mod tests {
         assert!(":Bike".parse::<Symbol>().is_err());
         assert!(Symbol::new(":bicycle").is_err());
         assert!(Symbol::new("on.foot").is_err());
+        assert!(Symbol::new("1st").is_err());
+        assert!(":042".parse::<Symbol>().is_err());
     }
 
     #[test]
@@ -244,11 +272,18 @@ mod tests {
         assert!(IdKind::new("clue.photo").is_err());
         assert!(IdKind::new("").is_err());
         assert!(IdKind::new("Clue").is_err());
+        assert!(IdKind::new("1clue").is_err());
     }
 
     #[test]
     fn id_round_trips() {
-        for text in ["clue.receipt_photo", "scene.case1.diner.arrive", "npc.a1"] {
+        for text in [
+            "clue.receipt_photo",
+            "scene.case1.diner.arrive",
+            "npc.a1",
+            "line.case1.carla.042",
+            "line.042",
+        ] {
             let id: Id = text.parse().unwrap();
             assert_eq!(id.to_string(), text);
         }
@@ -270,13 +305,17 @@ mod tests {
             "clue..photo",
             "clue.Photo",
             "clue.photo-1",
+            "clue._photo",
+            "1clue.photo",
+            "042.carla",
             "",
         ] {
             assert!(bad.parse::<Id>().is_err(), "{bad}");
         }
         let clue = IdKind::new("clue").unwrap();
         assert!(Id::new(clue.clone(), "").is_err());
-        assert!(Id::new(clue, "a..b").is_err());
+        assert!(Id::new(clue.clone(), "a..b").is_err());
+        assert_eq!(Id::new(clue, "042").unwrap().to_string(), "clue.042");
     }
 
     #[test]

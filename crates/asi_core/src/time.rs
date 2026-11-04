@@ -2,13 +2,13 @@
 //!
 //! # Literal formats
 //!
-//! [`Time`]:
-//! - `dN HH:MM`: day `N` (starting at 1, no leading zeros), one space, then a
-//!   two-digit hour (`00`–`23`) and two-digit minute (`00`–`59`).
-//!   `d1 00:00` is minute 0, `d3 22:00` is minute 4200.
-//! - `HH:MM`: shorthand for day 1.
+//! [`Time`]: `dN HH:MM`, that is `d`, the day `N` (starting at 1, no leading
+//! zeros), one space, a two-digit hour (`00`–`23`), `:` and a two-digit minute
+//! (`00`–`59`). `d1 00:00` is minute 0, `d3 22:00` is minute 4200.
 //!
-//! [`Display`](fmt::Display) always writes the `dN HH:MM` form.
+//! This is the only form. A bare `HH:MM` is rejected, because a time of day
+//! without a day is not a point in game time (ADR-002). [`Display`](fmt::Display)
+//! writes the same form, so the two round-trip.
 //!
 //! [`Duration`]: an optional `-`, then one or more `<number><unit>`
 //! components with units `d` (1440 minutes), `h` (60) and `m` (1), each used at
@@ -129,7 +129,7 @@ fn parse_number(digits: &str) -> std::result::Result<u64, &'static str> {
 /// Parses exactly two ASCII digits.
 fn parse_two_digits(digits: &str) -> std::result::Result<u32, &'static str> {
     if digits.len() != 2 || !digits.bytes().all(|b| b.is_ascii_digit()) {
-        return Err("expected `HH:MM` with two-digit hour and minute");
+        return Err("expected `dN HH:MM` with two-digit hour and minute");
     }
     digits.parse().map_err(|_| "expected two digits")
 }
@@ -137,28 +137,20 @@ fn parse_two_digits(digits: &str) -> std::result::Result<u32, &'static str> {
 impl FromStr for Time {
     type Err = CoreError;
 
-    /// Parses `dN HH:MM` or `HH:MM` (day 1).
+    /// Parses `dN HH:MM`, e.g. `d3 22:00`.
     fn from_str(s: &str) -> Result<Self> {
         let err = |reason| CoreError::InvalidTime {
             text: s.to_owned(),
             reason,
         };
-        let (day, clock) = match s.strip_prefix('d') {
-            Some(rest) => {
-                let (day, clock) = rest
-                    .split_once(' ')
-                    .ok_or_else(|| err("expected `dN HH:MM`"))?;
-                let day = parse_number(day).map_err(err)?;
-                (
-                    i64::try_from(day).map_err(|_| err("day is too large"))?,
-                    clock,
-                )
-            }
-            None => (1, s),
-        };
-        let (hour, minute) = clock
-            .split_once(':')
-            .ok_or_else(|| err("expected `HH:MM` or `dN HH:MM`"))?;
+        let shape = "expected `dN HH:MM`, e.g. `d3 22:00` (a day is required)";
+        let (day, clock) = s
+            .strip_prefix('d')
+            .and_then(|rest| rest.split_once(' '))
+            .ok_or_else(|| err(shape))?;
+        let day = parse_number(day).map_err(err)?;
+        let day = i64::try_from(day).map_err(|_| err("day is too large"))?;
+        let (hour, minute) = clock.split_once(':').ok_or_else(|| err(shape))?;
         let hour = parse_two_digits(hour).map_err(err)?;
         let minute = parse_two_digits(minute).map_err(err)?;
         Self::from_day_hm(day, hour, minute).map_err(|e| match e {
@@ -324,8 +316,7 @@ mod tests {
         assert_eq!(t("d1 00:00").minutes(), 0);
         assert_eq!(t("d2 00:00").minutes(), 1440);
         assert_eq!(t("d3 22:00").minutes(), 4200);
-        assert_eq!(t("22:00"), t("d1 22:00"));
-        assert_eq!(t("00:00"), Time::START);
+        assert_eq!(t("d1 00:00"), Time::START);
         assert_eq!(t("d1 23:59").minutes(), 1439);
     }
 
@@ -334,7 +325,6 @@ mod tests {
         for text in ["d1 00:00", "d3 22:00", "d10 09:05", "d1 23:59"] {
             assert_eq!(t(text).to_string(), text);
         }
-        assert_eq!(t("22:00").to_string(), "d1 22:00");
         for minutes in [0, 1, 59, 60, 1439, 1440, 4200, i64::MAX - 1, i64::MAX] {
             let time = Time::from_minutes(minutes).unwrap();
             assert_eq!(t(&time.to_string()), time, "{minutes}");
@@ -356,6 +346,9 @@ mod tests {
             "d 10:00",
             "d1 24:00",
             "d1 23:60",
+            "22:00",
+            "00:00",
+            "d1 9:00",
             "9:00",
             "09:0",
             "d1  09:00",
@@ -366,6 +359,8 @@ mod tests {
             "d+1 09:00",
             "+09:00",
             "09:00:00",
+            "d1 09:00:00",
+            "d1 09:0",
             "d99999999999999999999 00:00",
             "d9223372036854775807 00:00",
         ] {
@@ -390,7 +385,7 @@ mod tests {
         assert_eq!(start.checked_sub(d("23h")), Some(Time::START));
         assert_eq!(start.checked_sub(d("1d")), None);
         assert_eq!(start.checked_add(d("-1d")), None);
-        assert_eq!(start.checked_add(d("-1h")), Some(t("22:00")));
+        assert_eq!(start.checked_add(d("-1h")), Some(t("d1 22:00")));
         let max = Time::from_minutes(i64::MAX).unwrap();
         assert_eq!(max.checked_add(d("1m")), None);
         assert_eq!(max.checked_sub(Duration::from_minutes(i64::MIN)), None);
