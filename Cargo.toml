@@ -27,5 +27,8 @@ all = { level = "warn", priority = -1 }
 unwrap_used = "warn"
 expect_used = "warn"
 panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+unreachable = "warn"
 # No floats in game logic (spec: Determinism rules).
 float_arithmetic = "warn"

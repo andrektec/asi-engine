@@ -39,6 +39,8 @@ instead of guessing. Don't silently "fix" either side.
 
 - Implement only the slice you were asked for. Note follow-ups in the PR
   instead of doing them.
+- Never edit `docs/spec.md` in a PR. It is a synced copy of an external live
+  doc. If the spec needs to change, propose the change in the PR description.
 - Keep public APIs minimal and document every public item.
 - No new dependency without a one-line justification in the PR description.
   Add it to `[workspace.dependencies]` in the root `Cargo.toml`, and have crates

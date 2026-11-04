@@ -12,7 +12,7 @@
 - [ ] `cargo fmt --all --check` passes
 - [ ] `cargo clippy --workspace --all-targets -- -D warnings` passes
 - [ ] `cargo test --workspace` passes
-- [ ] Docs updated (crate docs, and `docs/spec.md` if behavior changed)
+- [ ] Crate docs updated; any needed spec change is proposed in the PR description
 - [ ] ADR added in `docs/decisions/` if a design decision was made
 - [ ] Each new dependency is justified below
 
