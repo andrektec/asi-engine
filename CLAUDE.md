@@ -35,6 +35,14 @@ instead of guessing. Don't silently "fix" either side.
 - **Content errors carry file and line.**
 - **No `unsafe`.** The workspace sets `unsafe_code = "forbid"`.
 
+## Public repository
+
+This repository is public. Never put anything from the local machine into
+files, commit messages or PR descriptions: no absolute paths, usernames,
+hostnames, environment variables, emails, tokens, tool output that contains any
+of these, or logs. Refer to files by repo-relative paths only (e.g.
+`crates/asi_core/src/state.rs`).
+
 ## Scope rules
 
 - Implement only the slice you were asked for. Note follow-ups in the PR
