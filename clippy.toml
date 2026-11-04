@@ -1,0 +1,14 @@
+# Tests may use unwrap/expect/panic; library and binary code may not.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+
+disallowed-types = [
+    { path = "std::collections::HashMap", reason = "use BTreeMap/IndexMap; iteration order must be deterministic" },
+    { path = "std::collections::HashSet", reason = "use BTreeMap/IndexMap; iteration order must be deterministic" },
+]
+
+disallowed-methods = [
+    { path = "std::time::SystemTime::now", reason = "game logic uses game time only" },
+    { path = "std::time::Instant::now", reason = "game logic uses game time only" },
+]

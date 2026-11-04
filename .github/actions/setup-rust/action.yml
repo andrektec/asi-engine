@@ -1,0 +1,14 @@
+name: Set up Rust
+description: Install the toolchain pinned in rust-toolchain.toml and enable the cargo cache.
+runs:
+  using: composite
+  steps:
+    - name: Read pinned toolchain
+      id: pin
+      shell: bash
+      run: echo "channel=$(grep -E '^channel' rust-toolchain.toml | cut -d '"' -f 2)" >> "$GITHUB_OUTPUT"
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ steps.pin.outputs.channel }}
+        components: rustfmt, clippy
+    - uses: Swatinem/rust-cache@v2

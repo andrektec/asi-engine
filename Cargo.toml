@@ -1,0 +1,31 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/andrektec/asi-engine"
+authors = ["The ASI Engine contributors"]
+
+[workspace.dependencies]
+# Internal crates. Third-party dependencies are added here too, each with a
+# justification in the PR that introduces it.
+asi_core = { path = "crates/asi_core", version = "0.0.0" }
+asi_expr = { path = "crates/asi_expr", version = "0.0.0" }
+asi_content = { path = "crates/asi_content", version = "0.0.0" }
+asi_save = { path = "crates/asi_save", version = "0.0.0" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+# Release builds must never panic on bad content or state (spec: Errors).
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+# No floats in game logic (spec: Determinism rules).
+float_arithmetic = "warn"
