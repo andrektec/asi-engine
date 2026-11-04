@@ -18,6 +18,10 @@ asi_expr = { path = "crates/asi_expr", version = "0.0.0" }
 asi_content = { path = "crates/asi_content", version = "0.0.0" }
 asi_save = { path = "crates/asi_save", version = "0.0.0" }
 
+# Property tests (dev-dependency only). Default features off: no fork or
+# timeout support, which pulls in more crates and isn't needed.
+proptest = { version = "1", default-features = false, features = ["std"] }
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 

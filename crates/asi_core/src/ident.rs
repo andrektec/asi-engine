@@ -22,6 +22,10 @@
 //! - [`Symbol`]: one name segment (`bicycle`, written `:bicycle` in content).
 //! - [`IdKind`]: one name segment (`clue`).
 //! - [`Id`]: a kind plus a dotted path (`clue.receipt_photo`).
+//!
+//! [`name_segment_error`] and [`path_segment_error`] check single segments,
+//! for other crates (such as the expression parser) that read names out of
+//! larger text and must apply the same rules.
 
 use std::fmt;
 use std::str::FromStr;
@@ -33,8 +37,11 @@ fn is_tail_char(c: char) -> bool {
     c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_'
 }
 
-/// Checks a name segment (`[a-z][a-z0-9_]*`); returns why it is invalid.
-fn name_segment_error(text: &str) -> Option<&'static str> {
+/// Checks a name segment (`[a-z][a-z0-9_]*`).
+///
+/// Returns `None` if `text` is a valid name segment, or a short reason (for
+/// error messages) if it isn't.
+pub fn name_segment_error(text: &str) -> Option<&'static str> {
     let mut chars = text.chars();
     match chars.next() {
         None => Some("must not be empty"),
@@ -46,8 +53,12 @@ fn name_segment_error(text: &str) -> Option<&'static str> {
     }
 }
 
-/// Checks a path segment (`[a-z0-9][a-z0-9_]*`); returns why it is invalid.
-fn path_segment_error(text: &str) -> Option<&'static str> {
+/// Checks a path segment (`[a-z0-9][a-z0-9_]*`).
+///
+/// Returns `None` if `text` is a valid path segment, or a short reason (for
+/// error messages) if it isn't. Dots are not allowed: pass one segment at a
+/// time.
+pub fn path_segment_error(text: &str) -> Option<&'static str> {
     let mut chars = text.chars();
     match chars.next() {
         None => Some("has an empty segment (check for stray dots)"),
