@@ -374,10 +374,7 @@ mod tests {
     #[test]
     fn core_time_is_in_every_state() {
         let mut state = state();
-        assert_eq!(
-            state.get(&Key::core_time()),
-            Ok(&Value::Time(Time::START))
-        );
+        assert_eq!(state.get(&Key::core_time()), Ok(&Value::Time(Time::START)));
         let later = Value::Time("d3 22:00".parse().unwrap());
         state.set(&Key::core_time(), later.clone()).unwrap();
         assert_eq!(state.get(&Key::core_time()), Ok(&later));
