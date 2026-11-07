@@ -56,7 +56,7 @@ impl State {
             return Err(CoreError::TypeMismatch {
                 key: key.clone(),
                 expected: ty.clone(),
-                found: value,
+                found: Box::new(value),
             });
         }
         self.values.insert(key.clone(), value);
@@ -127,7 +127,7 @@ fn broken_set(key: &Key, kind: IdKind, found: &Value) -> CoreError {
     CoreError::TypeMismatch {
         key: key.clone(),
         expected: Type::Set(kind),
-        found: found.clone(),
+        found: Box::new(found.clone()),
     }
 }
 
@@ -268,7 +268,7 @@ mod tests {
                 CoreError::TypeMismatch {
                     key: key(k),
                     expected: state.schema().key_type(&key(k)).unwrap().clone(),
-                    found: value
+                    found: Box::new(value)
                 }
             );
             assert_eq!(state.get(&key(k)), Ok(&before));
@@ -368,6 +368,75 @@ mod tests {
         assert_eq!(
             listed,
             ["location.bar", "location.diner.back", "location.zoo"]
+        );
+    }
+
+    #[test]
+    fn core_time_is_in_every_state() {
+        let mut state = state();
+        assert_eq!(state.get(&Key::core_time()), Ok(&Value::Time(Time::START)));
+        let later = Value::Time("d3 22:00".parse().unwrap());
+        state.set(&Key::core_time(), later.clone()).unwrap();
+        assert_eq!(state.get(&Key::core_time()), Ok(&later));
+        assert!(state.set(&Key::core_time(), Value::Int(0)).is_err());
+    }
+
+    #[test]
+    fn single_id_writes_are_checked() {
+        let mut kinds = KindRegistry::new();
+        for k in ["npc", "clue"] {
+            kinds
+                .register(IdKind::new(k).unwrap(), Owner::game())
+                .unwrap();
+        }
+        let mut schema = StateSchema::new(kinds);
+        schema.add_namespace("case", Owner::game()).unwrap();
+        let npc = Type::Ref(IdKind::new("npc").unwrap());
+        schema
+            .add_key(key("case.accused"), npc.clone(), Value::Ref(None))
+            .unwrap();
+        let mut state = State::new(&schema.freeze());
+        let accused = key("case.accused");
+        assert_eq!(state.get(&accused), Ok(&Value::Ref(None)));
+
+        let carla = Value::Ref(Some(id("npc.carla")));
+        state.set(&accused, carla.clone()).unwrap();
+        assert_eq!(state.get(&accused), Ok(&carla));
+        state.set(&accused, Value::Ref(None)).unwrap();
+        assert_eq!(state.get(&accused), Ok(&Value::Ref(None)));
+
+        for bad in [
+            Value::Ref(Some(id("clue.carla"))),
+            Value::Set([id("npc.carla")].into()),
+            Value::Bool(true),
+        ] {
+            let err = state.set(&accused, bad.clone()).unwrap_err();
+            assert_eq!(
+                err,
+                CoreError::TypeMismatch {
+                    key: accused.clone(),
+                    expected: npc.clone(),
+                    found: Box::new(bad)
+                }
+            );
+        }
+        assert_eq!(state.get(&accused), Ok(&Value::Ref(None)));
+        // Set operations don't apply to single-ID keys.
+        assert_eq!(
+            state.insert(&accused, id("npc.carla")),
+            Err(CoreError::NotASet {
+                key: accused.clone(),
+                found: npc
+            })
+        );
+        assert_eq!(
+            CoreError::TypeMismatch {
+                key: accused,
+                expected: Type::Ref(IdKind::new("npc").unwrap()),
+                found: Box::new(Value::Ref(Some(id("clue.carla"))))
+            }
+            .to_string(),
+            "cannot store `clue.carla` in key `case.accused`: expected a value of type `id<npc>`"
         );
     }
 

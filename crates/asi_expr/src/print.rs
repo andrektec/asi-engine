@@ -56,6 +56,7 @@ impl fmt::Display for Literal {
             Self::Time(v) => write!(f, "{v}"),
             Self::Duration(v) => write!(f, "{v}"),
             Self::Symbol(v) => write!(f, "{v}"),
+            Self::None => f.write_str("none"),
         }
     }
 }

@@ -47,6 +47,9 @@ of these, or logs. Refer to files by repo-relative paths only (e.g.
 
 - Implement only the slice you were asked for. Note follow-ups in the PR
   instead of doing them.
+- Never delete files under `proptest-regressions/`. They are committed on
+  purpose so past failures re-run first; keep them even if their seeds no
+  longer reproduce anything.
 - Never edit `docs/spec.md` in a PR. It is a synced copy of an external live
   doc. If the spec needs to change, propose the change in the PR description.
 - Keep public APIs minimal and document every public item.
