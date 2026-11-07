@@ -236,6 +236,7 @@ impl<'a> Parser<'a> {
         let literal = match &self.tok.tok {
             Tok::Int(v) => Some(Literal::Int(*v)),
             Tok::Bool(v) => Some(Literal::Bool(*v)),
+            Tok::None => Some(Literal::None),
             Tok::Time(v) => Some(Literal::Time(*v)),
             Tok::Duration(v) => Some(Literal::Duration(*v)),
             Tok::Symbol(v) => Some(Literal::Symbol(v.clone())),

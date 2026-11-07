@@ -135,6 +135,8 @@ fn literals() {
     assert_eq!(lit(&parse("9223372036854775807")), &Literal::Int(i64::MAX));
     assert_eq!(lit(&parse("true")), &Literal::Bool(true));
     assert_eq!(lit(&parse("false")), &Literal::Bool(false));
+    assert_eq!(lit(&parse("none")), &Literal::None);
+    assert_eq!(parse(" none ").span, Span::new(1, 5));
     assert_eq!(
         lit(&parse("d3 22:00")),
         &Literal::Time(Time::from_day_hm(3, 22, 0).unwrap())
@@ -174,6 +176,8 @@ fn paths() {
         "has",
         "line.case1.carla.042",
         "true.x",
+        "none.x",
+        "nones",
         "d3",
         "d3.x",
     ] {
@@ -512,7 +516,7 @@ fn line_col_positions() {
 fn path_from_str() {
     assert_eq!(path("a.b").to_string(), "a.b");
     for bad in [
-        "", "A", "a.", "a..b", ".a", "1a", "a b", "true", "false", "a-b",
+        "", "A", "a.", "a..b", ".a", "1a", "a b", "true", "false", "none", "a-b",
     ] {
         assert!(bad.parse::<Path>().is_err(), "{bad:?}");
     }
@@ -646,6 +650,8 @@ const CORPUS: &[&str] = &[
     "(a - b) - c",
     "f()",
     "f(g(h(1, 2), :x), true, false)",
+    "case.accused == none && none != case.first",
+    "f(none)",
     "line.case1.carla.042 == line.case1.carla.043",
     "x != :walk && y == :bicycle || z",
     "(a == b) != (c == d)",
@@ -680,13 +686,14 @@ fn at(kind: ExprKind) -> Expr {
 
 fn arb_path() -> impl Strategy<Value = Path> {
     "[a-z][a-z0-9_]{0,4}(\\.[a-z0-9][a-z0-9_]{0,4}){0,3}"
-        .prop_filter_map("boolean literal", |s| s.parse::<Path>().ok())
+        .prop_filter_map("literal", |s| s.parse::<Path>().ok())
 }
 
 fn arb_literal() -> impl Strategy<Value = Literal> {
     prop_oneof![
         (0..=i64::MAX).prop_map(Literal::Int),
         any::<bool>().prop_map(Literal::Bool),
+        Just(Literal::None),
         (0..=i64::MAX).prop_map(|m| Literal::Time(Time::from_minutes(m).unwrap_or_default())),
         (0..=i64::MAX).prop_map(|m| Literal::Duration(Duration::from_minutes(m))),
         "[a-z][a-z0-9_]{0,5}".prop_map(|s| Literal::Symbol(Symbol::new(&s).unwrap())),
