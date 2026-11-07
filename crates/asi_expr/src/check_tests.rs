@@ -1122,6 +1122,18 @@ fn wrong_schema_is_an_error() {
 }
 
 #[test]
+fn separately_built_identical_schema_evaluates() {
+    let condition_schema = schema();
+    let state_schema = schema();
+    let checked = compile_condition("var.met", &condition_schema, &functions()).unwrap();
+    let mut state = State::new(&state_schema);
+    state.set(&key("var.met"), Value::Bool(true)).unwrap();
+    let mut warnings = Vec::new();
+    assert_eq!(checked.eval(&state, &functions(), &mut warnings), Ok(true));
+    assert!(warnings.is_empty());
+}
+
+#[test]
 fn registry_mismatches_are_errors() {
     let checked = ok("test.passed(check.a)");
     let s = state();

@@ -28,7 +28,7 @@ impl CheckedCondition {
         functions: &FunctionRegistry,
         warnings: &mut Vec<EvalWarning>,
     ) -> Result<bool, EvalError> {
-        if state.schema() != &self.schema {
+        if !state.schema().same_as(&self.schema) {
             return Err(EvalError::WrongSchema);
         }
         let mut evaluator = Evaluator {

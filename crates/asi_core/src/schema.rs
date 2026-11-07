@@ -367,6 +367,13 @@ pub struct FrozenSchema {
 }
 
 impl FrozenSchema {
+    /// Whether `other` is the same schema: the same frozen instance (or a
+    /// clone of it), which is a pointer comparison, or else a structurally
+    /// equal schema built separately, which compares everything.
+    pub fn same_as(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.data, &other.data) || self.data == other.data
+    }
+
     /// The registered ID kinds.
     pub fn kinds(&self) -> &KindRegistry {
         &self.data.kinds
@@ -726,6 +733,19 @@ mod tests {
         assert!(!Owner::game().is_engine());
         assert_eq!(Owner::engine().module_name(), None);
         assert_eq!(Owner::engine().to_string(), "the engine");
+    }
+
+    #[test]
+    fn same_as() {
+        let frozen = schema().freeze();
+        assert!(frozen.same_as(&frozen.clone()));
+        let rebuilt = schema().freeze();
+        assert!(frozen.same_as(&rebuilt));
+        let mut different = schema();
+        different
+            .add_key(key("var.extra"), Type::Int, Value::Int(0))
+            .unwrap();
+        assert!(!frozen.same_as(&different.freeze()));
     }
 
     #[test]
