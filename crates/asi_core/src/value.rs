@@ -23,6 +23,8 @@ pub enum Type {
     Time,
     /// A span of game time.
     Duration,
+    /// One ID of the given kind, or none (`id<npc>`, ADR-004 §7).
+    Ref(IdKind),
 }
 
 impl fmt::Display for Type {
@@ -38,6 +40,7 @@ impl fmt::Display for Type {
             Self::Set(kind) => write!(f, "set<{kind}>"),
             Self::Time => f.write_str("time"),
             Self::Duration => f.write_str("duration"),
+            Self::Ref(kind) => write!(f, "id<{kind}>"),
         }
     }
 }
@@ -57,12 +60,15 @@ pub enum Value {
     Time(Time),
     /// A [`Type::Duration`] value.
     Duration(Duration),
+    /// A [`Type::Ref`] value: one ID, or `None` (written `none`).
+    Ref(Option<Id>),
 }
 
 impl Value {
     /// Whether this value is valid for `ty`: same variant, an enum symbol in
-    /// the allowed set, and every set member of the set's kind. An empty set
-    /// matches every set type.
+    /// the allowed set, every set member of the set's kind, and a single ID
+    /// of the `id<kind>`'s kind. An empty set matches every set type, and
+    /// `none` matches every `id<kind>` type.
     pub fn type_matches(&self, ty: &Type) -> bool {
         match (self, ty) {
             (Self::Bool(_), Type::Bool)
@@ -71,6 +77,8 @@ impl Value {
             | (Self::Duration(_), Type::Duration) => true,
             (Self::Enum(symbol), Type::Enum(allowed)) => allowed.contains(symbol),
             (Self::Set(members), Type::Set(kind)) => members.iter().all(|id| id.kind() == kind),
+            (Self::Ref(None), Type::Ref(_)) => true,
+            (Self::Ref(Some(id)), Type::Ref(kind)) => id.kind() == kind,
             _ => false,
         }
     }
@@ -89,6 +97,8 @@ impl fmt::Display for Value {
             }
             Self::Time(time) => write!(f, "{time}"),
             Self::Duration(duration) => write!(f, "{duration}"),
+            Self::Ref(Some(id)) => write!(f, "{id}"),
+            Self::Ref(None) => f.write_str("none"),
         }
     }
 }
@@ -142,7 +152,20 @@ mod tests {
             }
             assert!(!value.type_matches(&mode()));
             assert!(!value.type_matches(&Type::Set(kind("clue"))));
+            assert!(!value.type_matches(&Type::Ref(kind("npc"))));
         }
+    }
+
+    #[test]
+    fn single_ids_must_have_the_kind() {
+        let npc = Type::Ref(kind("npc"));
+        assert!(Value::Ref(None).type_matches(&npc));
+        assert!(Value::Ref(Some(id("npc.carla"))).type_matches(&npc));
+        assert!(!Value::Ref(Some(id("clue.carla"))).type_matches(&npc));
+        assert!(!Value::Ref(None).type_matches(&Type::Set(kind("npc"))));
+        assert!(!Value::Ref(Some(id("npc.carla"))).type_matches(&Type::Set(kind("npc"))));
+        assert!(!Value::Set(BTreeSet::new()).type_matches(&npc));
+        assert!(!Value::Bool(false).type_matches(&npc));
     }
 
     #[test]
@@ -177,5 +200,8 @@ mod tests {
             "d3 22:00"
         );
         assert_eq!(Value::Duration("90m".parse().unwrap()).to_string(), "1h30m");
+        assert_eq!(Type::Ref(kind("npc")).to_string(), "id<npc>");
+        assert_eq!(Value::Ref(Some(id("npc.carla"))).to_string(), "npc.carla");
+        assert_eq!(Value::Ref(None).to_string(), "none");
     }
 }
