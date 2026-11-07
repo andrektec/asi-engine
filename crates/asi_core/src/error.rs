@@ -73,12 +73,23 @@ pub enum CoreError {
         /// The key.
         key: Key,
     },
-    /// A `set<kind>` type names a kind that isn't registered.
+    /// A `set<kind>` or `id<kind>` type names a kind that isn't registered.
     UnknownKind {
         /// The key being declared.
         key: Key,
         /// The unregistered kind.
         kind: IdKind,
+        /// The key's declared type.
+        ty: Type,
+    },
+    /// A second holder set was marked for an ID kind (ADR-004 §1).
+    DuplicateHolder {
+        /// The kind.
+        kind: IdKind,
+        /// The kind's existing holder.
+        existing: Key,
+        /// The key that was rejected.
+        key: Key,
     },
     /// A key's declared default doesn't match its declared type.
     BadDefault {
@@ -86,8 +97,8 @@ pub enum CoreError {
         key: Key,
         /// The declared type.
         expected: Type,
-        /// The rejected default.
-        found: Value,
+        /// The rejected default. Boxed to keep the error small.
+        found: Box<Value>,
     },
     /// A key that isn't in the schema was read or written.
     UnknownKey {
@@ -100,8 +111,8 @@ pub enum CoreError {
         key: Key,
         /// The key's type.
         expected: Type,
-        /// The rejected value.
-        found: Value,
+        /// The rejected value. Boxed to keep the error small.
+        found: Box<Value>,
     },
     /// A set operation was used on a key that isn't a set.
     NotASet {
@@ -148,9 +159,17 @@ impl fmt::Display for CoreError {
                 key.namespace()
             ),
             Self::DuplicateKey { key } => write!(f, "state key `{key}` is already declared"),
-            Self::UnknownKind { key, kind } => write!(
+            Self::UnknownKind { key, kind, ty } => write!(
                 f,
-                "key `{key}` has type `set<{kind}>`, but ID kind `{kind}` is not registered"
+                "key `{key}` has type `{ty}`, but ID kind `{kind}` is not registered"
+            ),
+            Self::DuplicateHolder {
+                kind,
+                existing,
+                key,
+            } => write!(
+                f,
+                "cannot make `{key}` the holder of ID kind `{kind}`: `{existing}` already is"
             ),
             Self::BadDefault {
                 key,

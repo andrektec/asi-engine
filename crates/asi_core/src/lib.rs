@@ -6,16 +6,17 @@
 //! registry, and actions. It has no terminal or OS dependency, so the
 //! analyzer, tests and bots can run it headless.
 //!
-//! So far it provides the value model and state store (ADR-001):
+//! So far it provides the value model and state store (ADR-001, ADR-004):
 //!
 //! - [`Time`] and [`Duration`]: whole minutes, checked arithmetic, literal
 //!   parsing ([`time`] module docs list the formats).
 //! - [`Symbol`], [`IdKind`] and [`Id`]: validated identifiers ([`ident`]
 //!   module docs list the allowed characters).
 //! - [`Type`] and [`Value`]: `bool`, `int`, `enum`, `set<kind>`, `time`,
-//!   `duration`. No strings, no floats.
+//!   `duration` and `id<kind>` (one ID or `none`). No strings, no floats.
 //! - [`KindRegistry`], [`StateSchema`] and [`FrozenSchema`]: declared ID
-//!   kinds, namespaces and keys.
+//!   kinds, namespaces, keys and holder sets. Every schema contains the
+//!   engine's key `core.time` ([`Key::core_time`]).
 //! - [`State`]: the typed store, created from a frozen schema.
 //!
 //! All fallible operations return [`CoreError`]; nothing here panics.

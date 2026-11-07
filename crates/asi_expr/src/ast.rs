@@ -99,6 +99,8 @@ pub enum Literal {
     Duration(Duration),
     /// An enum symbol such as `:bicycle`.
     Symbol(Symbol),
+    /// `none`: the empty value of an `id<kind>` key (ADR-004 §7).
+    None,
 }
 
 /// One `+ x` or `- x` term of an [`ExprKind::Sum`].
@@ -166,7 +168,7 @@ impl CmpOp {
 ///
 /// One or more segments joined by single dots: the first is a name segment,
 /// later ones are path segments (ADR-002). A path of the single segment
-/// `true` or `false` is not allowed, because that text is a boolean literal.
+/// `true`, `false` or `none` is not allowed, because that text is a literal.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Path(String);
 
@@ -203,10 +205,10 @@ impl Path {
                 return Err(ParseError::new(span, message));
             }
         }
-        if text == "true" || text == "false" {
+        if text == "true" || text == "false" || text == "none" {
             return Err(ParseError::new(
                 Span::new(base, base + text.len()),
-                format!("`{text}` is a boolean literal, not a path"),
+                format!("`{text}` is a literal, not a path"),
             ));
         }
         Ok(Self(text.to_owned()))

@@ -11,6 +11,7 @@ use crate::span::Span;
 pub(crate) enum Tok {
     Int(i64),
     Bool(bool),
+    None,
     Time(Time),
     Duration(Duration),
     Symbol(Symbol),
@@ -260,7 +261,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// A dotted path, `true`/`false`, or a time literal `dN HH:MM`.
+    /// A dotted path, `true`/`false`/`none`, or a time literal `dN HH:MM`.
     fn path(&mut self, start: usize) -> Result<Token, ParseError> {
         self.eat_while(is_word_char);
         while self.peek() == Some('.') {
@@ -280,6 +281,7 @@ impl<'a> Lexer<'a> {
         let tok = match text {
             "true" => Tok::Bool(true),
             "false" => Tok::Bool(false),
+            "none" => Tok::None,
             _ if is_day_word(text)
                 && self.peek() == Some(' ')
                 && self.peek_second().is_some_and(|c| c.is_ascii_digit()) =>
